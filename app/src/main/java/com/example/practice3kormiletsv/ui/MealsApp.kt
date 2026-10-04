@@ -11,6 +11,10 @@ import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import com.example.practice3kormiletsv.MealsApplication
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -34,12 +38,15 @@ private enum class AppTab(val route: String, val label: String, val icon: Int) {
     ABOUT("about", "О приложении", R.drawable.ic_info)
 }
 
-private val MealsFactory = viewModelFactory {
-    initializer { MealsViewModel(createSavedStateHandle()) }
-}
-
 @Composable
-fun MealsApp(viewModel: MealsViewModel = viewModel(factory = MealsFactory)) {
+fun MealsApp() {
+    val container = (LocalContext.current.applicationContext as MealsApplication).container
+    val factory = remember(container) {
+        viewModelFactory {
+            initializer { MealsViewModel(createSavedStateHandle(), container.getMeals, container.getMeal, container.getFilterOptions) }
+        }
+    }
+    val viewModel: MealsViewModel = viewModel(factory = factory)
     val state by viewModel.state.collectAsStateWithLifecycle()
     val navController = rememberNavController()
     val entry by navController.currentBackStackEntryAsState()
@@ -81,7 +88,9 @@ fun MealsApp(viewModel: MealsViewModel = viewModel(factory = MealsFactory)) {
                     state = state,
                     onQueryChange = viewModel::setQuery,
                     onFilterChange = viewModel::setFilter,
-                    filterOptions = viewModel::filterOptions,
+                    onRefresh = viewModel::refresh,
+                    onFilterTypeChange = viewModel::selectFilterType,
+                    onRetryFilters = viewModel::retryFilters,
                     onReset = viewModel::resetSearch,
                     onMealClick = { navController.navigate("meal/$it") },
                     onFavoriteClick = viewModel::toggleFavorite
@@ -92,6 +101,7 @@ fun MealsApp(viewModel: MealsViewModel = viewModel(factory = MealsFactory)) {
                     state = state,
                     onMealClick = { navController.navigate("meal/$it") },
                     onFavoriteClick = viewModel::toggleFavorite,
+                    onRetry = viewModel::retryFavorites,
                     onBrowse = {
                         navController.navigate(AppTab.RECIPES.route) {
                             popUpTo(navController.graph.findStartDestination().id)
@@ -106,8 +116,15 @@ fun MealsApp(viewModel: MealsViewModel = viewModel(factory = MealsFactory)) {
                 arguments = listOf(navArgument("mealId") { type = NavType.StringType })
             ) { detailEntry ->
                 val id = detailEntry.arguments?.getString("mealId").orEmpty()
+                val detailFactory = remember(container) {
+                    viewModelFactory { initializer { MealDetailViewModel(createSavedStateHandle(), container.getMeal) } }
+                }
+                val detailViewModel: MealDetailViewModel = viewModel(viewModelStoreOwner = detailEntry, factory = detailFactory)
+                val detailState by detailViewModel.state.collectAsStateWithLifecycle()
+                LaunchedEffect(detailState.meal) { detailState.meal?.let(viewModel::registerMeal) }
                 MealDetailScreen(
-                    meal = viewModel.getMeal(id),
+                    state = detailState,
+                    onRetry = detailViewModel::retry,
                     isFavorite = id in state.favoriteIds,
                     onBack = { navController.popBackStack() },
                     onFavoriteClick = { viewModel.toggleFavorite(id) }
