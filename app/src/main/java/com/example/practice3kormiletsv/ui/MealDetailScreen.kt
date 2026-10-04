@@ -1,6 +1,5 @@
 package com.example.practice3kormiletsv.ui
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,7 +34,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -44,14 +42,16 @@ import androidx.compose.ui.unit.dp
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
 import com.example.practice3kormiletsv.R
-import com.example.practice3kormiletsv.data.Meal
+
 
 @Composable
-fun MealDetailScreen(meal: Meal?, isFavorite: Boolean, onBack: () -> Unit, onFavoriteClick: () -> Unit) {
-    if (meal == null) {
+fun MealDetailScreen(state: MealDetailUiState, isFavorite: Boolean, onBack: () -> Unit, onFavoriteClick: () -> Unit, onRetry: () -> Unit) {
+    val meal = state.meal
+    if (state.isLoading || state.error != null || meal == null) {
         Column {
             IconButton(onClick = onBack) { Icon(painterResource(R.drawable.ic_back), "Назад") }
-            EmptyState("Рецепт не найден", "Вернитесь к списку и выберите другое блюдо.", "К рецептам", onBack, R.drawable.ic_recipes)
+            if (state.isLoading) LoadingState("Загружаем рецепт…", Modifier.testTag("detail_loading"))
+            else ErrorState(state.error ?: "Рецепт не найден.", onRetry, Modifier.testTag("detail_error"))
         }
         return
     }
@@ -64,7 +64,7 @@ fun MealDetailScreen(meal: Meal?, isFavorite: Boolean, onBack: () -> Unit, onFav
     ) {
         item(key = "photo") {
             Box(Modifier.fillMaxWidth().height(320.dp)) {
-                Image(painterResource(meal.summary.imageRes), meal.summary.name, Modifier.matchParentSize(), contentScale = ContentScale.Crop)
+                RecipePhoto(meal.summary.thumbnailUrl, meal.summary.name, Modifier.matchParentSize())
                 Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.34f), Color.Transparent, Color.Black.copy(alpha = 0.2f)))))
                 Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                     Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerLow) {
@@ -94,13 +94,13 @@ fun MealDetailScreen(meal: Meal?, isFavorite: Boolean, onBack: () -> Unit, onFav
                     modifier = Modifier.constrainAs(title) { top.linkTo(category.bottom, 10.dp); start.linkTo(parent.start); end.linkTo(parent.end); width = Dimension.fillToConstraints }.testTag("detail_title")
                 )
                 Text(
-                    meal.summary.originalName,
+                    "Оригинальный рецепт TheMealDB",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.constrainAs(original) { top.linkTo(title.bottom, 10.dp); start.linkTo(parent.start); end.linkTo(parent.end); width = Dimension.fillToConstraints }
                 )
                 LabelPill(
-                    meal.summary.areaLabel + " кухня",
+                    meal.summary.areaLabel.ifBlank { "Кухня не указана" },
                     Modifier.constrainAs(area) { top.linkTo(original.bottom, 18.dp); start.linkTo(parent.start); end.linkTo(count.start, 8.dp); width = Dimension.fillToConstraints }
                 )
                 LabelPill(
@@ -151,7 +151,7 @@ fun MealDetailScreen(meal: Meal?, isFavorite: Boolean, onBack: () -> Unit, onFav
                 Column(Modifier.padding(horizontal = 24.dp)) {
                     Text("Готовим шаг за шагом", style = MaterialTheme.typography.titleLarge)
                     Spacer(Modifier.height(6.dp))
-                    Text("Шагов: ${meal.instructions.size} · перевод рецепта TheMealDB", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Шагов: ${meal.instructions.size} · оригинальный рецепт TheMealDB", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(22.dp))
                 }
             }
@@ -165,6 +165,9 @@ fun MealDetailScreen(meal: Meal?, isFavorite: Boolean, onBack: () -> Unit, onFav
                 }
             }
         }
+        if ((section == 0 && meal.ingredients.isEmpty()) || (section == 1 && meal.instructions.isEmpty())) {
+            item { Text("TheMealDB пока не предоставил эти данные.", Modifier.padding(24.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
         item(key = "links") {
             Column(Modifier.padding(horizontal = 24.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 meal.youtubeUrl?.let { url ->
@@ -173,7 +176,12 @@ fun MealDetailScreen(meal: Meal?, isFavorite: Boolean, onBack: () -> Unit, onFav
                         Text("  Видеорецепт")
                     }
                 }
-                Text("Рецепт и фотография предоставлены TheMealDB. Название и инструкция переведены для учебного приложения.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                meal.sourceUrl?.let { url ->
+                    OutlinedButton(onClick = { uriHandler.openUri(url) }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Оригинал рецепта")
+                    }
+                }
+                Text("Рецепт и фотография предоставлены TheMealDB. Ингредиенты и инструкция приведены на языке источника.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
