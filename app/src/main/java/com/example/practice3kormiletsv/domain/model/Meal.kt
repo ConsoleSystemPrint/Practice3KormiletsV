@@ -5,7 +5,8 @@ data class MealSummary(
     val name: String,
     val category: String,
     val area: String,
-    val thumbnailUrl: String
+    val thumbnailUrl: String,
+    val localImagePath: String? = null
 )
 
 data class Ingredient(val name: String, val measure: String)

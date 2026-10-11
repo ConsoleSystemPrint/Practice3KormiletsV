@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import com.example.practice3kormiletsv.R
 import com.example.practice3kormiletsv.domain.model.MealSummary
 import coil3.compose.AsyncImage
+import java.io.File
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
@@ -57,13 +58,15 @@ fun BrandHeader() {
 }
 
 @Composable
-fun FavoriteButton(isFavorite: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun FavoriteButton(isFavorite: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, isSaving: Boolean = false) {
     IconToggleButton(
         checked = isFavorite,
+        enabled = !isSaving,
         onCheckedChange = { onClick() },
         modifier = modifier.size(48.dp)
     ) {
-        Icon(
+        if (isSaving) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+        else Icon(
             painterResource(if (isFavorite) R.drawable.ic_heart_filled else R.drawable.ic_heart),
             contentDescription = if (isFavorite) "Удалить из избранного" else "Добавить в избранное",
             tint = if (isFavorite) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -73,7 +76,7 @@ fun FavoriteButton(isFavorite: Boolean, onClick: () -> Unit, modifier: Modifier 
 }
 
 @Composable
-fun MealCard(meal: MealSummary, isFavorite: Boolean, onClick: () -> Unit, onFavoriteClick: () -> Unit) {
+fun MealCard(meal: MealSummary, isFavorite: Boolean, onClick: () -> Unit, onFavoriteClick: () -> Unit, isSaving: Boolean = false) {
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().testTag("meal_${meal.id}"),
@@ -83,6 +86,7 @@ fun MealCard(meal: MealSummary, isFavorite: Boolean, onClick: () -> Unit, onFavo
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             RecipePhoto(
                 url = meal.thumbnailUrl,
+                localImagePath = meal.localImagePath,
                 description = meal.name,
                 modifier = Modifier.size(114.dp).clip(RoundedCornerShape(14.dp))
             )
@@ -94,7 +98,7 @@ fun MealCard(meal: MealSummary, isFavorite: Boolean, onClick: () -> Unit, onFavo
                 Spacer(Modifier.height(8.dp))
                 if (meal.area.isNotBlank()) Text(meal.areaLabel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            FavoriteButton(isFavorite, onFavoriteClick, Modifier.testTag("favorite_${meal.id}"))
+            FavoriteButton(isFavorite, onFavoriteClick, Modifier.testTag("favorite_${meal.id}"), isSaving)
         }
     }
 }
@@ -123,10 +127,10 @@ fun EmptyState(title: String, description: String, buttonText: String, onClick: 
 }
 
 @Composable
-fun RecipePhoto(url: String, description: String, modifier: Modifier = Modifier) {
+fun RecipePhoto(url: String, description: String, modifier: Modifier = Modifier, localImagePath: String? = null) {
     Box(modifier.background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
         Icon(painterResource(R.drawable.ic_bowl), null, Modifier.size(40.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        AsyncImage(model = url, contentDescription = description, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        AsyncImage(model = localImagePath?.let { File(it) } ?: url, contentDescription = description, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
     }
 }
 

@@ -45,7 +45,15 @@ import com.example.practice3kormiletsv.R
 
 
 @Composable
-fun MealDetailScreen(state: MealDetailUiState, isFavorite: Boolean, onBack: () -> Unit, onFavoriteClick: () -> Unit, onRetry: () -> Unit) {
+fun MealDetailScreen(
+    state: MealDetailUiState,
+    isFavorite: Boolean,
+    onBack: () -> Unit,
+    onFavoriteClick: () -> Unit,
+    onRetry: () -> Unit,
+    isSaving: Boolean = false,
+    localImagePath: String? = null
+) {
     val meal = state.meal
     if (state.isLoading || state.error != null || meal == null) {
         Column {
@@ -64,14 +72,14 @@ fun MealDetailScreen(state: MealDetailUiState, isFavorite: Boolean, onBack: () -
     ) {
         item(key = "photo") {
             Box(Modifier.fillMaxWidth().height(320.dp)) {
-                RecipePhoto(meal.summary.thumbnailUrl, meal.summary.name, Modifier.matchParentSize())
+                RecipePhoto(meal.summary.thumbnailUrl, meal.summary.name, Modifier.matchParentSize(), localImagePath ?: meal.summary.localImagePath)
                 Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.34f), Color.Transparent, Color.Black.copy(alpha = 0.2f)))))
                 Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                     Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerLow) {
                         IconButton(onClick = onBack, modifier = Modifier.testTag("detail_back")) { Icon(painterResource(R.drawable.ic_back), "Назад") }
                     }
                     Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerLow) {
-                        FavoriteButton(isFavorite, onFavoriteClick, Modifier.testTag("detail_favorite"))
+                        FavoriteButton(isFavorite, onFavoriteClick, Modifier.testTag("detail_favorite"), isSaving)
                     }
                 }
                 Surface(Modifier.align(Alignment.BottomStart).padding(20.dp), shape = RoundedCornerShape(50), color = Color.White.copy(alpha = 0.95f)) {

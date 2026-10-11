@@ -65,8 +65,8 @@ fun AboutScreen() {
                     Text("Открыть TheMealDB  ")
                     Icon(painterResource(R.drawable.ic_external), null, Modifier.size(18.dp))
                 }
-                Text("Избранное сохраняется при переключении экранов и повороте устройства. После нового запуска коллекцию можно собрать заново.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("Практическая работа № 4 · TheMealDB", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                Text("Настройки поиска сохраняются после выхода. Избранные рецепты вместе с фотографиями, ингредиентами и инструкциями доступны без интернета.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Практическая работа № 5 · TheMealDB", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             }
         }
     }

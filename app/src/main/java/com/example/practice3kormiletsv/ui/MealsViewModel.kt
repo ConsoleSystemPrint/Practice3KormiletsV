@@ -1,21 +1,22 @@
 package com.example.practice3kormiletsv.ui
 
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.practice3kormiletsv.domain.model.FilterOption
-import com.example.practice3kormiletsv.domain.model.FilterType
-import com.example.practice3kormiletsv.domain.model.Meal
+import com.example.practice3kormiletsv.domain.cache.SettingsBadgeCache
 import com.example.practice3kormiletsv.domain.model.MealFilter
 import com.example.practice3kormiletsv.domain.model.MealSummary
-import com.example.practice3kormiletsv.domain.usecase.GetFilterOptionsUseCase
-import com.example.practice3kormiletsv.domain.usecase.GetMealUseCase
+import com.example.practice3kormiletsv.domain.model.SearchSettings
+import com.example.practice3kormiletsv.domain.usecase.AddFavoriteUseCase
 import com.example.practice3kormiletsv.domain.usecase.GetMealsUseCase
+import com.example.practice3kormiletsv.domain.usecase.ObserveFavoritesUseCase
+import com.example.practice3kormiletsv.domain.usecase.ObserveSearchSettingsUseCase
+import com.example.practice3kormiletsv.domain.usecase.RemoveFavoriteUseCase
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -25,107 +26,92 @@ data class MealsUiState(
     val meals: List<MealSummary> = emptyList(),
     val isLoading: Boolean = true,
     val error: String? = null,
+    val settingsActive: Boolean = false,
     val favorites: List<MealSummary> = emptyList(),
     val favoriteIds: Set<String> = emptySet(),
-    val favoritesLoading: Boolean = false,
-    val favoritesError: String? = null,
-    val filterType: FilterType = FilterType.CATEGORY,
-    val filterOptions: Map<FilterType, List<FilterOption>> = emptyMap(),
-    val filtersLoading: Boolean = true,
-    val filtersError: String? = null
+    val pendingFavoriteIds: Set<String> = emptySet(),
+    val favoritesLoading: Boolean = true,
+    val favoritesError: String? = null
 )
 
 class MealsViewModel(
-    private val savedStateHandle: SavedStateHandle,
     private val getMeals: GetMealsUseCase,
-    private val getMeal: GetMealUseCase,
-    private val getFilterOptions: GetFilterOptionsUseCase
+    private val observeSearchSettings: ObserveSearchSettingsUseCase,
+    private val observeFavorites: ObserveFavoritesUseCase,
+    private val addFavorite: AddFavoriteUseCase,
+    private val removeFavorite: RemoveFavoriteUseCase,
+    private val badgeCache: SettingsBadgeCache
 ) : ViewModel() {
-    private val restoredFilter = savedStateHandle.get<String>("filterType")?.let { type ->
-        val filterType = FilterType.entries.firstOrNull { it.name == type } ?: return@let null
-        savedStateHandle.get<String>("filterValue")?.let { MealFilter(filterType, it) }
-    }
-    private val mutableState = MutableStateFlow(
-        MealsUiState(
-            query = savedStateHandle["query"] ?: "",
-            filter = restoredFilter,
-            favoriteIds = savedStateHandle.get<ArrayList<String>>("favorites").orEmpty().toSet()
-        )
-    )
+    private val mutableState = MutableStateFlow(MealsUiState())
     val state = mutableState.asStateFlow()
-    private val knownMeals = mutableMapOf<String, MealSummary>()
+    private val messageChannel = Channel<String>(Channel.BUFFERED)
+    val messages = messageChannel.receiveAsFlow()
     private var mealsJob: Job? = null
-    private var filtersJob: Job? = null
     private var favoritesJob: Job? = null
+    private var settingsLoaded = false
 
     init {
-        loadMeals()
-        loadFilterOptions(FilterType.CATEGORY)
+        viewModelScope.launch {
+            badgeCache.isActive.collect { active -> mutableState.update { it.copy(settingsActive = active) } }
+        }
+        viewModelScope.launch {
+            try {
+                observeSearchSettings().collect { settings ->
+                    badgeCache.update(settings)
+                    mutableState.update { it.copy(query = settings.query, filter = settings.filter) }
+                    if (!settingsLoaded) {
+                        settingsLoaded = true
+                        loadMeals()
+                    }
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                mutableState.update { it.copy(isLoading = false, error = "Не удалось прочитать настройки. Откройте настройки и повторите попытку.") }
+            }
+        }
         loadFavorites()
     }
 
-    fun setQuery(query: String) {
-        if (query == state.value.query) return
-        savedStateHandle["query"] = query
-        mutableState.update { it.copy(query = query) }
-        loadMeals(debounce = true)
-    }
-
-    fun setFilter(filter: MealFilter?) {
-        if (filter == state.value.filter) return
-        savedStateHandle["filterType"] = filter?.type?.name
-        savedStateHandle["filterValue"] = filter?.value
-        mutableState.update { it.copy(filter = filter) }
-        loadMeals()
-    }
-
-    fun resetSearch() {
-        savedStateHandle["query"] = ""
-        savedStateHandle["filterType"] = null
-        savedStateHandle["filterValue"] = null
-        mutableState.update { it.copy(query = "", filter = null) }
-        loadMeals()
-    }
-
-    fun refresh() {
+    fun applySettings(settings: SearchSettings) {
+        settingsLoaded = true
+        badgeCache.update(settings)
+        mutableState.update { it.copy(query = settings.query, filter = settings.filter) }
         loadMeals(forceRefresh = true)
-        if (state.value.filterOptions[FilterType.CATEGORY].isNullOrEmpty()) {
-            loadFilterOptions(FilterType.CATEGORY, forceRefresh = true)
+    }
+
+    fun refresh() = loadMeals(forceRefresh = true)
+    fun retryFavorites() = loadFavorites()
+
+    fun toggleFavorite(id: String) {
+        if (id in state.value.pendingFavoriteIds) return
+        val removing = id in state.value.favoriteIds
+        mutableState.update { it.copy(pendingFavoriteIds = it.pendingFavoriteIds + id) }
+        viewModelScope.launch {
+            try {
+                if (removing) removeFavorite(id) else addFavorite(id)
+                if (!removing) messageChannel.send("Рецепт и фото сохранены для просмотра без интернета")
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                messageChannel.send(
+                    if (removing) "Не удалось удалить рецепт. Попробуйте ещё раз."
+                    else "Не удалось сохранить рецепт и фото. Проверьте интернет и свободное место, затем повторите."
+                )
+            } finally {
+                mutableState.update { it.copy(pendingFavoriteIds = it.pendingFavoriteIds - id) }
+            }
         }
     }
 
-    fun selectFilterType(type: FilterType) {
-        mutableState.update { it.copy(filterType = type) }
-        loadFilterOptions(type)
-    }
-
-    fun retryFilters() = loadFilterOptions(state.value.filterType, forceRefresh = true)
-    fun retryFavorites() = loadFavorites()
-
-    fun registerMeal(meal: Meal) {
-        knownMeals[meal.summary.id] = meal.summary
-        updateFavorites()
-    }
-
-    fun toggleFavorite(id: String) {
-        if (knownMeals[id] == null && id !in state.value.favoriteIds) return
-        val updated = state.value.favoriteIds.let { if (id in it) it - id else it + id }
-        savedStateHandle["favorites"] = ArrayList(updated)
-        mutableState.update { it.copy(favoriteIds = updated) }
-        loadFavorites()
-    }
-
-    private fun loadMeals(forceRefresh: Boolean = false, debounce: Boolean = false) {
+    private fun loadMeals(forceRefresh: Boolean = false) {
         mealsJob?.cancel()
         val request = state.value
         mutableState.update { it.copy(isLoading = true, error = null, meals = emptyList()) }
         mealsJob = viewModelScope.launch {
             try {
-                if (debounce) delay(400)
                 getMeals(request.query, request.filter, forceRefresh).collect { meals ->
-                    meals.forEach { knownMeals[it.id] = it }
                     mutableState.update { it.copy(meals = meals, isLoading = false, error = null) }
-                    updateFavorites()
                 }
             } catch (error: CancellationException) {
                 throw error
@@ -135,43 +121,21 @@ class MealsViewModel(
         }
     }
 
-    private fun loadFilterOptions(type: FilterType, forceRefresh: Boolean = false) {
-        filtersJob?.cancel()
-        mutableState.update { it.copy(filtersLoading = true, filtersError = null) }
-        filtersJob = viewModelScope.launch {
-            try {
-                val options = getFilterOptions(type, forceRefresh)
-                mutableState.update { it.copy(filterOptions = it.filterOptions + (type to options), filtersLoading = false) }
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Exception) {
-                mutableState.update { it.copy(filtersLoading = false, filtersError = error.userMessage()) }
-            }
-        }
-    }
-
     private fun loadFavorites() {
         favoritesJob?.cancel()
-        updateFavorites()
-        val missing = state.value.favoriteIds.filter { it !in knownMeals }
-        mutableState.update { it.copy(favoritesLoading = missing.isNotEmpty(), favoritesError = null) }
-        if (missing.isEmpty()) return
+        mutableState.update { it.copy(favoritesLoading = true, favoritesError = null) }
         favoritesJob = viewModelScope.launch {
             try {
-                missing.forEach { id ->
-                    knownMeals[id] = getMeal(id).summary
-                    updateFavorites()
+                observeFavorites().collect { favorites ->
+                    mutableState.update {
+                        it.copy(favorites = favorites, favoriteIds = favorites.map { meal -> meal.id }.toSet(), favoritesLoading = false)
+                    }
                 }
-                mutableState.update { it.copy(favoritesLoading = false) }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
-                mutableState.update { it.copy(favoritesLoading = false, favoritesError = error.userMessage()) }
+                mutableState.update { it.copy(favoritesLoading = false, favoritesError = "Не удалось прочитать избранное из памяти устройства.") }
             }
         }
-    }
-
-    private fun updateFavorites() {
-        mutableState.update { current -> current.copy(favorites = current.favoriteIds.mapNotNull { knownMeals[it] }) }
     }
 }

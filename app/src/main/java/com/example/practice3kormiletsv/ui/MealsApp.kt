@@ -8,6 +8,8 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -43,7 +45,10 @@ fun MealsApp() {
     val container = (LocalContext.current.applicationContext as MealsApplication).container
     val factory = remember(container) {
         viewModelFactory {
-            initializer { MealsViewModel(createSavedStateHandle(), container.getMeals, container.getMeal, container.getFilterOptions) }
+            initializer {
+                MealsViewModel(container.getMeals, container.observeSearchSettings, container.observeFavorites,
+                    container.addFavorite, container.removeFavorite, container.settingsBadgeCache)
+            }
         }
     }
     val viewModel: MealsViewModel = viewModel(factory = factory)
@@ -51,13 +56,18 @@ fun MealsApp() {
     val navController = rememberNavController()
     val entry by navController.currentBackStackEntryAsState()
     val route = entry?.destination?.route
-    val isDetail = route == "meal/{mealId}"
+    val showBottomBar = route != "meal/{mealId}" && route != "settings"
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(viewModel) {
+        viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
-            if (!isDetail) {
+            if (showBottomBar) {
                 NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
                     AppTab.entries.forEach { tab ->
                         NavigationBarItem(
@@ -86,12 +96,8 @@ fun MealsApp() {
             composable(AppTab.RECIPES.route) {
                 MealListScreen(
                     state = state,
-                    onQueryChange = viewModel::setQuery,
-                    onFilterChange = viewModel::setFilter,
+                    onSettingsClick = { navController.navigate("settings") { launchSingleTop = true } },
                     onRefresh = viewModel::refresh,
-                    onFilterTypeChange = viewModel::selectFilterType,
-                    onRetryFilters = viewModel::retryFilters,
-                    onReset = viewModel::resetSearch,
                     onMealClick = { navController.navigate("meal/$it") },
                     onFavoriteClick = viewModel::toggleFavorite
                 )
@@ -111,6 +117,35 @@ fun MealsApp() {
                 )
             }
             composable(AppTab.ABOUT.route) { AboutScreen() }
+            composable("settings") { settingsEntry ->
+                val settingsFactory = remember(container) {
+                    viewModelFactory {
+                        initializer {
+                            SearchSettingsViewModel(createSavedStateHandle(), container.observeSearchSettings,
+                                container.saveSearchSettings, container.getFilterOptions, container.settingsBadgeCache)
+                        }
+                    }
+                }
+                val settingsViewModel: SearchSettingsViewModel = viewModel(viewModelStoreOwner = settingsEntry, factory = settingsFactory)
+                val settingsState by settingsViewModel.state.collectAsStateWithLifecycle()
+                LaunchedEffect(settingsState.savedSettings) {
+                    settingsState.savedSettings?.let { settings ->
+                        viewModel.applySettings(settings)
+                        navController.popBackStack()
+                    }
+                }
+                SearchSettingsScreen(
+                    state = settingsState,
+                    onBack = { navController.popBackStack() },
+                    onQueryChange = settingsViewModel::setQuery,
+                    onTypeChange = settingsViewModel::setType,
+                    onValueChange = settingsViewModel::setValue,
+                    onRetry = settingsViewModel::loadSettings,
+                    onRetryOptions = settingsViewModel::retryOptions,
+                    onReset = settingsViewModel::reset,
+                    onSave = settingsViewModel::save
+                )
+            }
             composable(
                 route = "meal/{mealId}",
                 arguments = listOf(navArgument("mealId") { type = NavType.StringType })
@@ -121,13 +156,14 @@ fun MealsApp() {
                 }
                 val detailViewModel: MealDetailViewModel = viewModel(viewModelStoreOwner = detailEntry, factory = detailFactory)
                 val detailState by detailViewModel.state.collectAsStateWithLifecycle()
-                LaunchedEffect(detailState.meal) { detailState.meal?.let(viewModel::registerMeal) }
                 MealDetailScreen(
                     state = detailState,
                     onRetry = detailViewModel::retry,
                     isFavorite = id in state.favoriteIds,
                     onBack = { navController.popBackStack() },
-                    onFavoriteClick = { viewModel.toggleFavorite(id) }
+                    onFavoriteClick = { viewModel.toggleFavorite(id) },
+                    isSaving = id in state.pendingFavoriteIds,
+                    localImagePath = state.favorites.firstOrNull { it.id == id }?.localImagePath
                 )
             }
         }
