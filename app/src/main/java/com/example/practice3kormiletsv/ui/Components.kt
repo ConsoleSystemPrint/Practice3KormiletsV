@@ -1,6 +1,5 @@
 package com.example.practice3kormiletsv.ui
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,7 +34,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.practice3kormiletsv.R
-import com.example.practice3kormiletsv.data.MealSummary
+import com.example.practice3kormiletsv.domain.model.MealSummary
+import coil3.compose.AsyncImage
+import java.io.File
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
 
 @Composable
 fun BrandHeader() {
@@ -54,13 +58,15 @@ fun BrandHeader() {
 }
 
 @Composable
-fun FavoriteButton(isFavorite: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun FavoriteButton(isFavorite: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, isSaving: Boolean = false) {
     IconToggleButton(
         checked = isFavorite,
+        enabled = !isSaving,
         onCheckedChange = { onClick() },
         modifier = modifier.size(48.dp)
     ) {
-        Icon(
+        if (isSaving) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+        else Icon(
             painterResource(if (isFavorite) R.drawable.ic_heart_filled else R.drawable.ic_heart),
             contentDescription = if (isFavorite) "Удалить из избранного" else "Добавить в избранное",
             tint = if (isFavorite) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -70,7 +76,7 @@ fun FavoriteButton(isFavorite: Boolean, onClick: () -> Unit, modifier: Modifier 
 }
 
 @Composable
-fun MealCard(meal: MealSummary, isFavorite: Boolean, onClick: () -> Unit, onFavoriteClick: () -> Unit) {
+fun MealCard(meal: MealSummary, isFavorite: Boolean, onClick: () -> Unit, onFavoriteClick: () -> Unit, isSaving: Boolean = false) {
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().testTag("meal_${meal.id}"),
@@ -78,21 +84,21 @@ fun MealCard(meal: MealSummary, isFavorite: Boolean, onClick: () -> Unit, onFavo
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
     ) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Image(
-                painter = painterResource(meal.imageRes),
-                contentDescription = meal.name,
-                modifier = Modifier.size(114.dp).clip(RoundedCornerShape(14.dp)),
-                contentScale = ContentScale.Crop
+            RecipePhoto(
+                url = meal.thumbnailUrl,
+                localImagePath = meal.localImagePath,
+                description = meal.name,
+                modifier = Modifier.size(114.dp).clip(RoundedCornerShape(14.dp))
             )
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-                Text(meal.categoryLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(meal.categoryLabel.ifBlank { "РЕЦЕПТ" }, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(6.dp))
                 Text(meal.name, style = MaterialTheme.typography.titleMedium, maxLines = 3, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(8.dp))
-                Text(meal.areaLabel + " кухня", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (meal.area.isNotBlank()) Text(meal.areaLabel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            FavoriteButton(isFavorite, onFavoriteClick, Modifier.testTag("favorite_${meal.id}"))
+            FavoriteButton(isFavorite, onFavoriteClick, Modifier.testTag("favorite_${meal.id}"), isSaving)
         }
     }
 }
@@ -117,5 +123,32 @@ fun EmptyState(title: String, description: String, buttonText: String, onClick: 
         Text(title, style = MaterialTheme.typography.headlineMedium)
         Text(description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         Button(onClick = onClick) { Text(buttonText) }
+    }
+}
+
+@Composable
+fun RecipePhoto(url: String, description: String, modifier: Modifier = Modifier, localImagePath: String? = null) {
+    Box(modifier.background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
+        Icon(painterResource(R.drawable.ic_bowl), null, Modifier.size(40.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        AsyncImage(model = localImagePath?.let { File(it) } ?: url, contentDescription = description, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+    }
+}
+
+@Composable
+fun LoadingState(text: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier.fillMaxWidth().heightIn(min = 150.dp).padding(20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)
+    ) {
+        CircularProgressIndicator(Modifier.size(34.dp), strokeWidth = 3.dp)
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier) {
+        EmptyState("Не удалось загрузить", message, "Повторить", onRetry, R.drawable.ic_info)
     }
 }
