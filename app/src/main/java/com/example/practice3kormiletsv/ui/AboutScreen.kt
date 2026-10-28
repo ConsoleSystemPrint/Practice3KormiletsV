@@ -66,7 +66,7 @@ fun AboutScreen() {
                     Icon(painterResource(R.drawable.ic_external), null, Modifier.size(18.dp))
                 }
                 Text("Настройки поиска сохраняются после выхода. Избранные рецепты вместе с фотографиями, ингредиентами и инструкциями доступны без интернета.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("Практическая работа № 5 · TheMealDB", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                Text("Практическая работа № 6 · TheMealDB", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             }
         }
     }

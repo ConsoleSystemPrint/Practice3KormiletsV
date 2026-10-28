@@ -15,6 +15,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.Intent
+import android.net.Uri
+import kotlinx.coroutines.launch
+import com.example.practice3kormiletsv.ui.profile.ProfileViewModel
+import com.example.practice3kormiletsv.ui.profile.ProfileScreen
+import com.example.practice3kormiletsv.ui.profile.EditProfileViewModel
+import com.example.practice3kormiletsv.ui.profile.EditProfileRoute
+import com.example.practice3kormiletsv.ui.profile.PdfViewerViewModel
+import com.example.practice3kormiletsv.ui.profile.PdfViewerScreen
 import androidx.compose.ui.platform.LocalContext
 import com.example.practice3kormiletsv.MealsApplication
 import androidx.compose.ui.Modifier
@@ -37,12 +49,14 @@ import com.example.practice3kormiletsv.R
 private enum class AppTab(val route: String, val label: String, val icon: Int) {
     RECIPES("recipes", "Рецепты", R.drawable.ic_recipes),
     FAVORITES("favorites", "Избранное", R.drawable.ic_heart),
+    PROFILE("profile", "Профиль", R.drawable.ic_profile),
     ABOUT("about", "О приложении", R.drawable.ic_info)
 }
 
 @Composable
 fun MealsApp() {
-    val container = (LocalContext.current.applicationContext as MealsApplication).container
+    val context = LocalContext.current
+    val container = (context.applicationContext as MealsApplication).container
     val factory = remember(container) {
         viewModelFactory {
             initializer {
@@ -56,8 +70,9 @@ fun MealsApp() {
     val navController = rememberNavController()
     val entry by navController.currentBackStackEntryAsState()
     val route = entry?.destination?.route
-    val showBottomBar = route != "meal/{mealId}" && route != "settings"
+    val showBottomBar = route in AppTab.entries.map { it.route }
     val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     LaunchedEffect(viewModel) {
         viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
     }
@@ -115,6 +130,56 @@ fun MealsApp() {
                         }
                     }
                 )
+            }
+            composable(AppTab.PROFILE.route) { profileEntry ->
+                val profileFactory = remember(container) {
+                    viewModelFactory { initializer { ProfileViewModel(container.observeProfile, container.downloadResume) } }
+                }
+                val profileViewModel: ProfileViewModel = viewModel(viewModelStoreOwner = profileEntry, factory = profileFactory)
+                val profileState by profileViewModel.state.collectAsStateWithLifecycle()
+                LaunchedEffect(profileViewModel) {
+                    profileViewModel.documents.collect { document ->
+                        val uri = Uri.parse(document.uri)
+                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                            setDataAndType(uri, document.mimeType)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            clipData = ClipData.newRawUri(document.name, uri)
+                        }
+                        try { context.startActivity(intent) }
+                        catch (_: ActivityNotFoundException) {
+                            if (document.mimeType == "application/pdf") {
+                                navController.navigate("profile/document?documentUri=${Uri.encode(document.uri)}&documentName=${Uri.encode(document.name)}")
+                            } else snackbarHostState.showSnackbar("На устройстве нет просмотрщика для этого типа файла. Попробуйте ссылку на PDF.")
+                        }
+                        catch (_: SecurityException) {
+                            snackbarHostState.showSnackbar("Не удалось открыть скачанный документ в просмотрщике.")
+                        }
+                    }
+                }
+                ProfileScreen(profileState, onEdit = { navController.navigate("profile/edit") { launchSingleTop = true } }, onResume = profileViewModel::openResume, onRetry = profileViewModel::load)
+            }
+            composable("profile/edit") { profileEntry ->
+                val editFactory = remember(container) {
+                    viewModelFactory {
+                        initializer {
+                            EditProfileViewModel(createSavedStateHandle(), container.observeProfile, container.saveProfile,
+                                container.importAvatar, container.createCameraCapture, container.deleteDraftPhoto)
+                        }
+                    }
+                }
+                val editViewModel: EditProfileViewModel = viewModel(viewModelStoreOwner = profileEntry, factory = editFactory)
+                EditProfileRoute(editViewModel, onExit = { navController.popBackStack() }, onMessage = { message -> scope.launch { snackbarHostState.showSnackbar(message) } })
+            }
+            composable(
+                "profile/document?documentUri={documentUri}&documentName={documentName}",
+                arguments = listOf(navArgument("documentUri") { type = NavType.StringType }, navArgument("documentName") { type = NavType.StringType })
+            ) { documentEntry ->
+                val pdfFactory = remember(context.applicationContext) {
+                    viewModelFactory { initializer { PdfViewerViewModel(context.applicationContext as MealsApplication, createSavedStateHandle()) } }
+                }
+                val pdfViewModel: PdfViewerViewModel = viewModel(viewModelStoreOwner = documentEntry, factory = pdfFactory)
+                val pdfState by pdfViewModel.state.collectAsStateWithLifecycle()
+                PdfViewerScreen(pdfState, onBack = { navController.popBackStack() }, onRetry = pdfViewModel::retry, onPrevious = pdfViewModel::previous, onNext = pdfViewModel::next)
             }
             composable(AppTab.ABOUT.route) { AboutScreen() }
             composable("settings") { settingsEntry ->

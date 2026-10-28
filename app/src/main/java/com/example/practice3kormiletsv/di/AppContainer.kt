@@ -1,6 +1,15 @@
 package com.example.practice3kormiletsv.di
 
 import android.content.Context
+import com.example.practice3kormiletsv.data.local.FileProfileRepository
+import com.example.practice3kormiletsv.data.local.LocalAvatarRepository
+import com.example.practice3kormiletsv.data.repository.NetworkResumeRepository
+import com.example.practice3kormiletsv.domain.usecase.ObserveProfileUseCase
+import com.example.practice3kormiletsv.domain.usecase.SaveProfileUseCase
+import com.example.practice3kormiletsv.domain.usecase.ImportAvatarUseCase
+import com.example.practice3kormiletsv.domain.usecase.CreateCameraCaptureUseCase
+import com.example.practice3kormiletsv.domain.usecase.DeleteDraftPhotoUseCase
+import com.example.practice3kormiletsv.domain.usecase.DownloadResumeUseCase
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.room.Room
 import com.example.practice3kormiletsv.data.local.FavoritesDatabase
@@ -63,6 +72,15 @@ class AppContainer(context: Context) {
     )
     private val settings = PreferencesSearchSettingsRepository(context.searchSettingsStore)
     private val repository = OfflineMealRepository(NetworkMealRepository(api), favorites)
+    private val profile = FileProfileRepository(File(context.filesDir, "profile.json"))
+    private val avatars = LocalAvatarRepository(context)
+    private val resumes = NetworkResumeRepository(context, imageClient)
+    val observeProfile = ObserveProfileUseCase(profile)
+    val saveProfile = SaveProfileUseCase(profile)
+    val importAvatar = ImportAvatarUseCase(avatars)
+    val createCameraCapture = CreateCameraCaptureUseCase(avatars)
+    val deleteDraftPhoto = DeleteDraftPhotoUseCase(avatars)
+    val downloadResume = DownloadResumeUseCase(resumes)
     val settingsBadgeCache = SettingsBadgeCache()
     val observeSearchSettings = ObserveSearchSettingsUseCase(settings)
     val saveSearchSettings = SaveSearchSettingsUseCase(settings)
