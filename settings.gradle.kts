@@ -24,4 +24,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "Practice3KormiletsV"
 include(":app")
- 
+include(":core:ui")
+include(":feature:profile")

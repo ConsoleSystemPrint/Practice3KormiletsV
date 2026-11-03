@@ -42,6 +42,9 @@ import androidx.compose.ui.unit.dp
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
 import com.example.practice3kormiletsv.R
+import com.example.practice3kormiletsv.core.ui.ErrorState
+import com.example.practice3kormiletsv.core.ui.LoadingState
+import com.example.practice3kormiletsv.core.ui.R as CoreR
 
 
 @Composable
@@ -57,7 +60,7 @@ fun MealDetailScreen(
     val meal = state.meal
     if (state.isLoading || state.error != null || meal == null) {
         Column {
-            IconButton(onClick = onBack) { Icon(painterResource(R.drawable.ic_back), "Назад") }
+            IconButton(onClick = onBack) { Icon(painterResource(CoreR.drawable.ic_back), "Назад") }
             if (state.isLoading) LoadingState("Загружаем рецепт…", Modifier.testTag("detail_loading"))
             else ErrorState(state.error ?: "Рецепт не найден.", onRetry, Modifier.testTag("detail_error"))
         }
@@ -76,7 +79,7 @@ fun MealDetailScreen(
                 Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.34f), Color.Transparent, Color.Black.copy(alpha = 0.2f)))))
                 Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                     Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerLow) {
-                        IconButton(onClick = onBack, modifier = Modifier.testTag("detail_back")) { Icon(painterResource(R.drawable.ic_back), "Назад") }
+                        IconButton(onClick = onBack, modifier = Modifier.testTag("detail_back")) { Icon(painterResource(CoreR.drawable.ic_back), "Назад") }
                     }
                     Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerLow) {
                         FavoriteButton(isFavorite, onFavoriteClick, Modifier.testTag("detail_favorite"), isSaving)

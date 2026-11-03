@@ -24,6 +24,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.example.practice3kormiletsv.R
+import com.example.practice3kormiletsv.core.ui.EmptyState
+import com.example.practice3kormiletsv.core.ui.ErrorState
+import com.example.practice3kormiletsv.core.ui.LoadingState
 
 @Composable
 fun MealListScreen(

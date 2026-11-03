@@ -43,8 +43,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.example.practice3kormiletsv.R
+import com.example.practice3kormiletsv.core.ui.ErrorState
+import com.example.practice3kormiletsv.core.ui.LoadingState
 import com.example.practice3kormiletsv.domain.model.FilterOption
 import com.example.practice3kormiletsv.domain.model.FilterType
+import com.example.practice3kormiletsv.core.ui.R as CoreR
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,7 +69,7 @@ fun SearchSettingsScreen(
     Scaffold(
         topBar = {
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack, enabled = !state.isSaving) { Icon(painterResource(R.drawable.ic_back), "Назад") }
+                IconButton(onClick = onBack, enabled = !state.isSaving) { Icon(painterResource(CoreR.drawable.ic_back), "Назад") }
                 Text("Настройки поиска", style = MaterialTheme.typography.titleLarge)
             }
         },
