@@ -18,14 +18,14 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import com.example.practice3kormiletsv.R
-import com.example.practice3kormiletsv.BuildConfig
 import com.chuckerteam.chucker.api.Chucker
-import androidx.compose.ui.platform.LocalContext
+import com.example.practice3kormiletsv.BuildConfig
+import com.example.practice3kormiletsv.R
 
 @Composable
 fun AboutScreen() {
@@ -66,7 +66,7 @@ fun AboutScreen() {
                     Icon(painterResource(R.drawable.ic_external), null, Modifier.size(18.dp))
                 }
                 Text("Настройки поиска сохраняются после выхода. Избранные рецепты вместе с фотографиями, ингредиентами и инструкциями доступны без интернета.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("Практическая работа № 6 · TheMealDB", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                Text("Практическая работа № 7 · TheMealDB", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             }
         }
     }

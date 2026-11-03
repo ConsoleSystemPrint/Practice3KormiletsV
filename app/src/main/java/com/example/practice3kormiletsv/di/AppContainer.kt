@@ -1,37 +1,29 @@
 package com.example.practice3kormiletsv.di
 
 import android.content.Context
-import com.example.practice3kormiletsv.data.local.FileProfileRepository
-import com.example.practice3kormiletsv.data.local.LocalAvatarRepository
-import com.example.practice3kormiletsv.data.repository.NetworkResumeRepository
-import com.example.practice3kormiletsv.domain.usecase.ObserveProfileUseCase
-import com.example.practice3kormiletsv.domain.usecase.SaveProfileUseCase
-import com.example.practice3kormiletsv.domain.usecase.ImportAvatarUseCase
-import com.example.practice3kormiletsv.domain.usecase.CreateCameraCaptureUseCase
-import com.example.practice3kormiletsv.domain.usecase.DeleteDraftPhotoUseCase
-import com.example.practice3kormiletsv.domain.usecase.DownloadResumeUseCase
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.room.Room
-import com.example.practice3kormiletsv.data.local.FavoritesDatabase
-import com.example.practice3kormiletsv.data.local.FavoriteImageStorage
-import com.example.practice3kormiletsv.data.local.PreferencesSearchSettingsRepository
-import com.example.practice3kormiletsv.data.repository.RoomFavoriteRepository
-import com.example.practice3kormiletsv.data.repository.OfflineMealRepository
-import com.example.practice3kormiletsv.domain.cache.SettingsBadgeCache
-import com.example.practice3kormiletsv.domain.usecase.ObserveSearchSettingsUseCase
-import com.example.practice3kormiletsv.domain.usecase.SaveSearchSettingsUseCase
-import com.example.practice3kormiletsv.domain.usecase.ObserveFavoritesUseCase
-import com.example.practice3kormiletsv.domain.usecase.AddFavoriteUseCase
-import com.example.practice3kormiletsv.domain.usecase.RemoveFavoriteUseCase
-import java.io.File
 import com.chuckerteam.chucker.api.ChuckerCollector
 import com.chuckerteam.chucker.api.ChuckerInterceptor
+import com.example.practice3kormiletsv.data.local.FavoriteImageStorage
+import com.example.practice3kormiletsv.data.local.FavoritesDatabase
+import com.example.practice3kormiletsv.data.local.PreferencesSearchSettingsRepository
 import com.example.practice3kormiletsv.data.remote.MealDbApi
 import com.example.practice3kormiletsv.data.remote.TestKeyInterceptor
 import com.example.practice3kormiletsv.data.repository.NetworkMealRepository
+import com.example.practice3kormiletsv.data.repository.OfflineMealRepository
+import com.example.practice3kormiletsv.data.repository.RoomFavoriteRepository
+import com.example.practice3kormiletsv.domain.cache.SettingsBadgeCache
+import com.example.practice3kormiletsv.domain.usecase.AddFavoriteUseCase
 import com.example.practice3kormiletsv.domain.usecase.GetFilterOptionsUseCase
 import com.example.practice3kormiletsv.domain.usecase.GetMealUseCase
 import com.example.practice3kormiletsv.domain.usecase.GetMealsUseCase
+import com.example.practice3kormiletsv.domain.usecase.ObserveFavoritesUseCase
+import com.example.practice3kormiletsv.domain.usecase.ObserveSearchSettingsUseCase
+import com.example.practice3kormiletsv.domain.usecase.RemoveFavoriteUseCase
+import com.example.practice3kormiletsv.domain.usecase.SaveSearchSettingsUseCase
+import com.example.practice3kormiletsv.feature.profile.ProfileFeature
+import java.io.File
 import java.util.concurrent.TimeUnit
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
@@ -40,6 +32,8 @@ import retrofit2.converter.gson.GsonConverterFactory
 private val Context.searchSettingsStore by preferencesDataStore(name = "search_settings")
 
 class AppContainer(context: Context) {
+    val profileFeature = ProfileFeature(context)
+
     private val client = OkHttpClient.Builder()
         .addInterceptor(TestKeyInterceptor())
         .addInterceptor(
@@ -72,15 +66,6 @@ class AppContainer(context: Context) {
     )
     private val settings = PreferencesSearchSettingsRepository(context.searchSettingsStore)
     private val repository = OfflineMealRepository(NetworkMealRepository(api), favorites)
-    private val profile = FileProfileRepository(File(context.filesDir, "profile.json"))
-    private val avatars = LocalAvatarRepository(context)
-    private val resumes = NetworkResumeRepository(context, imageClient)
-    val observeProfile = ObserveProfileUseCase(profile)
-    val saveProfile = SaveProfileUseCase(profile)
-    val importAvatar = ImportAvatarUseCase(avatars)
-    val createCameraCapture = CreateCameraCaptureUseCase(avatars)
-    val deleteDraftPhoto = DeleteDraftPhotoUseCase(avatars)
-    val downloadResume = DownloadResumeUseCase(resumes)
     val settingsBadgeCache = SettingsBadgeCache()
     val observeSearchSettings = ObserveSearchSettingsUseCase(settings)
     val saveSearchSettings = SaveSearchSettingsUseCase(settings)
